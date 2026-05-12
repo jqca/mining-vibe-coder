@@ -7,7 +7,7 @@ export type VizType =
   | 'price' | 'closure' | 'seabed' | 'recycle' | 'safety' | 'supply';
 
 const VIZ_MAP: Record<string, VizType> = {
-  'vein': 'vein', 'geological': 'vein', 'survey': 'vein',
+  'vein': 'vein', 'survey': 'vein',
   'excavation': 'excavation', 'mining-plan': 'excavation',
   'grade': 'grade', 'ore-grade': 'grade',
   'beneficiation': 'beneficiation', 'mineral-processing': 'beneficiation',
@@ -16,10 +16,10 @@ const VIZ_MAP: Record<string, VizType> = {
   'hauling': 'hauling', 'fleet': 'hauling', 'truck': 'hauling',
   'environment': 'environment', 'monitoring': 'environment',
   'raremetal': 'raremetal', 'rare': 'raremetal',
-  'geology': 'geology', 'geological-model': 'geology',
+  'geological-model': 'geology', 'geological': 'geology', 'geology': 'geology',
   'blast': 'blast', 'blasting': 'blast',
   'drainage': 'drainage', 'water': 'drainage',
-  'reserves': 'reserves', 'resource-estimation': 'reserves',
+  'reserve': 'reserves', 'reserves': 'reserves', 'resource-estimation': 'reserves',
   'iot': 'iot', 'sensor': 'iot',
   'dust': 'dust',
   'price': 'price', 'commodity': 'price',
@@ -349,29 +349,63 @@ const ReservesViz: React.FC<VizProps> = ({ running, optimized, onNodeClick }) =>
   );
 };
 
-/* ---- iot: sensor mesh ---- */
+/* ---- iot: underground tunnel cross-section with sensor nodes ---- */
 const IotViz: React.FC<VizProps> = ({ running, optimized, selectedNode, onNodeClick }) => {
-  const sensors = [[80,60],[200,50],[320,70],[100,130],[220,140],[340,125]];
-  const links: [number,number][] = [[0,1],[1,2],[0,3],[1,4],[2,5],[3,4],[4,5]];
+  /* Draw a tunnel cross-section (arch shape) with IoT sensor nodes at walls/ceiling/floor */
+  const tunnelY = 60;
+  const tunnelH = 120;
+  const tunnelW = 260;
+  const cx = 200;
+  const sensorPos = [
+    {x:cx-110, y:tunnelY+40, label:'壁面左'},
+    {x:cx,     y:tunnelY+5,  label:'天井'},
+    {x:cx+110, y:tunnelY+40, label:'壁面右'},
+    {x:cx-70,  y:tunnelY+tunnelH-10, label:'床左'},
+    {x:cx,     y:tunnelY+tunnelH/2,  label:'中央'},
+    {x:cx+70,  y:tunnelY+tunnelH-10, label:'床右'},
+  ];
+  /* wireless links: each sensor talks to its neighbors */
+  const links: [number,number][] = [[0,1],[1,2],[0,3],[3,4],[4,5],[2,5],[1,4]];
   return (
     <g>
-      <text x="200" y="18" fill={TX} fontSize="10" textAnchor="middle">鉱山IoTセンサー</text>
+      <text x="200" y="18" fill={TX} fontSize="10" textAnchor="middle">鉱山IoTセンサーネットワーク</text>
+      {/* tunnel arch outline */}
+      <path d={`M${cx-tunnelW/2},${tunnelY+tunnelH} L${cx-tunnelW/2},${tunnelY+40} Q${cx},${tunnelY-20} ${cx+tunnelW/2},${tunnelY+40} L${cx+tunnelW/2},${tunnelY+tunnelH} Z`}
+        fill="none" stroke={optimized ? C2 : MU} strokeWidth={optimized ? 2 : 1} opacity={optimized ? 0.5 : 0.2}/>
+      {/* rock strata texture lines */}
+      {[30,55,80,105].map((dy,i) => (
+        <line key={`st${i}`} x1={cx-tunnelW/2-15} y1={tunnelY+dy} x2={cx-tunnelW/2-5} y2={tunnelY+dy}
+          stroke={MU} strokeWidth="0.5" opacity="0.15"/>
+      ))}
+      {/* wireless links (dashed when not optimized) */}
       {links.map(([a,b],i) => (
-        <line key={i} x1={sensors[a][0]} y1={sensors[a][1]} x2={sensors[b][0]} y2={sensors[b][1]}
-          stroke={optimized ? '#2dd4bf' : MU} strokeWidth={optimized ? 1.2 : 0.5} opacity={optimized ? 0.4 : 0.15}>
-          {running && <animate attributeName="opacity" values="0.1;0.4;0.1" dur="2s" repeatCount="indefinite"/>}
+        <line key={i} x1={sensorPos[a].x} y1={sensorPos[a].y} x2={sensorPos[b].x} y2={sensorPos[b].y}
+          stroke={optimized ? '#2dd4bf' : MU} strokeWidth={optimized ? 1.5 : 0.6}
+          strokeDasharray={optimized ? 'none' : '3 2'} opacity={optimized ? 0.5 : 0.15}>
+          {running && <animate attributeName="opacity" values="0.1;0.5;0.1" dur={`${1.8+i*0.15}s`} repeatCount="indefinite"/>}
         </line>
       ))}
-      {sensors.map(([x,y],i) => (
-        <g key={i} onClick={() => onNodeClick(String(i))} style={{cursor:'pointer'}}>
-          <circle cx={x} cy={y} r={selectedNode===String(i) ? 8 : 5}
-            fill={selectedNode===String(i) ? '#eab308' : (optimized ? C1 : C2)} opacity="0.8">
-            {running && <animate attributeName="opacity" values="0.3;0.9;0.3" dur={`${1+i*0.15}s`} repeatCount="indefinite"/>}
-          </circle>
-          {optimized && <text x={x} y={y-10} fill={C1} fontSize="6" textAnchor="middle">{`IoT${i+1}`}</text>}
-        </g>
+      {/* sensor nodes (diamonds for IoT) */}
+      {sensorPos.map((s,i) => {
+        const sel = selectedNode===String(i);
+        const r = sel ? 9 : 6;
+        return (
+          <g key={i} onClick={() => onNodeClick(String(i))} style={{cursor:'pointer'}}>
+            <rect x={s.x-r} y={s.y-r} width={r*2} height={r*2} rx="2"
+              fill={sel ? '#eab308' : (optimized ? C1 : C2)} opacity={optimized ? 0.85 : 0.4}
+              transform={`rotate(45,${s.x},${s.y})`}>
+              {running && <animate attributeName="opacity" values="0.3;0.9;0.3" dur={`${1+i*0.15}s`} repeatCount="indefinite"/>}
+            </rect>
+            {optimized && <text x={s.x} y={s.y-r-4} fill={C1} fontSize="5" textAnchor="middle">{s.label}</text>}
+          </g>
+        );
+      })}
+      {/* signal wave arcs from central sensor */}
+      {optimized && [14,22,30].map((r,i) => (
+        <circle key={`w${i}`} cx={cx} cy={tunnelY+tunnelH/2} r={r} fill="none"
+          stroke="#2dd4bf" strokeWidth="0.6" opacity={0.25-i*0.06} strokeDasharray="2 3"/>
       ))}
-      <text x="200" y="190" fill={MU} fontSize="8" textAnchor="middle">{optimized ? 'IoT 6/6 稼働中' : 'センサー待機'}</text>
+      <text x="200" y="200" fill={MU} fontSize="8" textAnchor="middle">{optimized ? 'IoT 6/6 稼働中 遅延<5ms' : 'センサー待機'}</text>
     </g>
   );
 };
@@ -489,25 +523,74 @@ const RecycleViz: React.FC<VizProps> = ({ running, optimized, onNodeClick }) => 
   );
 };
 
-/* ---- safety: hazard monitoring ---- */
+/* ---- safety: worker risk matrix with zone-based indicators ---- */
 const SafetyViz: React.FC<VizProps> = ({ running, optimized, onNodeClick }) => {
-  const hazards = [[100,80],[200,120],[300,70],[150,160],[280,150]];
+  /* 4x3 risk matrix: rows=severity (Low/Med/High/Critical), cols=likelihood (Low/Med/High) */
+  const cols = 3; const rows = 4;
+  const cellW = 70; const cellH = 30;
+  const ox = 80; const oy = 38;
+  const riskColor = (r: number, c: number): string => {
+    const score = r + c;
+    if (score >= 4) return '#ff4444';
+    if (score >= 3) return C2;
+    if (score >= 2) return '#eab308';
+    return '#2dd4bf';
+  };
+  /* Worker count per cell (optimized shows redistribution) */
+  const baseCounts = [[12,4,1],[8,6,2],[3,5,3],[1,2,1]];
+  const optCounts  = [[18,6,0],[10,4,0],[4,2,0],[2,1,0]];
+  const sevLabels = ['低','中','高','危'];
+  const likLabels = ['低','中','高'];
   return (
     <g>
-      <text x="200" y="18" fill={TX} fontSize="10" textAnchor="middle">鉱山労働安全AI</text>
-      <rect x="50" y="35" width="300" height="155" rx="5" fill="none" stroke={MU} strokeWidth="0.8" strokeDasharray="4 3" opacity="0.3"/>
-      {hazards.map(([x,y],i) => {
-        const col = optimized ? (i%2===0 ? '#2dd4bf' : '#ff4444') : MU;
-        return (
-          <g key={i} onClick={() => onNodeClick(String(i))} style={{cursor:'pointer'}}>
-            <circle cx={x} cy={y} r={optimized ? 15 : 10} fill={col} opacity={optimized ? 0.25 : 0.1}>
-              {running && <animate attributeName="r" values="8;16;8" dur={`${1.5+i*0.2}s`} repeatCount="indefinite"/>}
-            </circle>
-            {optimized && <text x={x} y={y+4} fill={TX} fontSize="8" textAnchor="middle">{i%2===0 ? '✓' : '!'}</text>}
-          </g>
-        );
-      })}
-      <text x="200" y="205" fill={MU} fontSize="8" textAnchor="middle">{optimized ? '危険検知 3件 対処済' : '安全監視待機'}</text>
+      <text x="200" y="16" fill={TX} fontSize="10" textAnchor="middle">鉱山労働安全AI</text>
+      {/* axis labels */}
+      <text x={ox+cols*cellW/2} y={oy-4} fill={MU} fontSize="6" textAnchor="middle">発生頻度 →</text>
+      <text x={ox-18} y={oy+rows*cellH/2} fill={MU} fontSize="6" textAnchor="middle"
+        transform={`rotate(-90,${ox-18},${oy+rows*cellH/2})`}>重大度 →</text>
+      {/* column headers */}
+      {likLabels.map((l,c) => (
+        <text key={`ch${c}`} x={ox+c*cellW+cellW/2} y={oy+8} fill={MU} fontSize="6" textAnchor="middle">{l}</text>
+      ))}
+      {/* row headers */}
+      {sevLabels.map((s,r) => (
+        <text key={`rh${r}`} x={ox-8} y={oy+14+r*cellH+cellH/2} fill={MU} fontSize="6" textAnchor="middle">{s}</text>
+      ))}
+      {/* matrix cells */}
+      {Array.from({length:rows}).flatMap((_,r) =>
+        Array.from({length:cols}).map((_,c) => {
+          const x = ox+c*cellW; const y = oy+14+r*cellH;
+          const col = riskColor(r,c);
+          const cnt = optimized ? optCounts[r][c] : baseCounts[r][c];
+          return (
+            <g key={`${r}-${c}`} onClick={() => onNodeClick(`${r}-${c}`)} style={{cursor:'pointer'}}>
+              <rect x={x} y={y} width={cellW-2} height={cellH-2} rx="3"
+                fill={col} opacity={optimized ? 0.35 : 0.12} stroke={col} strokeWidth="0.5">
+                {running && <animate attributeName="opacity"
+                  values={`${optimized?0.2:0.06};${optimized?0.4:0.15};${optimized?0.2:0.06}`}
+                  dur={`${1.5+r*0.2+c*0.15}s`} repeatCount="indefinite"/>}
+              </rect>
+              <text x={x+cellW/2-1} y={y+cellH/2+2} fill={TX} fontSize="9" fontWeight="bold" textAnchor="middle">
+                {cnt}
+              </text>
+            </g>
+          );
+        })
+      )}
+      {/* arrow showing risk reduction */}
+      {optimized && (
+        <g>
+          <line x1={ox+cols*cellW+8} y1={oy+14+rows*cellH-5} x2={ox+cols*cellW+8} y2={oy+20}
+            stroke="#2dd4bf" strokeWidth="1.5" markerEnd="url(#safeArrow)"/>
+          <text x={ox+cols*cellW+16} y={oy+rows*cellH/2+14} fill="#2dd4bf" fontSize="5"
+            transform={`rotate(-90,${ox+cols*cellW+16},${oy+rows*cellH/2+14})`}>リスク低減</text>
+        </g>
+      )}
+      <defs><marker id="safeArrow" markerWidth="5" markerHeight="4" refX="4" refY="2" orient="auto">
+        <path d="M0,0 L5,2 L0,4" fill="#2dd4bf"/></marker></defs>
+      <text x="200" y="205" fill={MU} fontSize="8" textAnchor="middle">
+        {optimized ? '高リスク作業者 0名 達成' : '安全監視待機'}
+      </text>
     </g>
   );
 };
